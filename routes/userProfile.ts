@@ -64,21 +64,28 @@ export function getUserProfile () {
         const numericRegex = /^-?\d+(?:\.\d+)?$/
         const booleanRegex = /^(?:true|false|null|undefined)$/
 
-        const isSafe = singleQuoteRegex.test(code) ||
+        const hasInterpolation = (str: string) => /([#!]{)/.test(str)
+
+        const isSafe = (singleQuoteRegex.test(code) ||
           doubleQuoteRegex.test(code) ||
           backtickRegex.test(code) ||
           numericRegex.test(code) ||
-          booleanRegex.test(code)
+          booleanRegex.test(code)) &&
+          !hasInterpolation(code)
 
         if (!isSafe) {
           throw new Error('Unsafe code execution blocked')
         }
-        username = eval(code) // eslint-disable-line no-eval
+        const evaluated = eval(code) // eslint-disable-line no-eval
+        if (typeof evaluated === 'string' && hasInterpolation(evaluated)) {
+          throw new Error('Unsafe code execution blocked')
+        }
+        username = evaluated
       } catch (err) {
-        username = '\\' + username
+        username = username ? ('\\' + username).replace(/(^|[^\\])((?:\\\\)*)([#!]{)/g, '$1$2\\$3') : username
       }
     } else {
-      username = '\\' + username
+      username = username ? ('\\' + username).replace(/(^|[^\\])((?:\\\\)*)([#!]{)/g, '$1$2\\$3') : username
     }
 
     const themeKey = config.get<string>('application.theme') as keyof typeof themes
